@@ -490,7 +490,7 @@ describe('ResultSet', () => {
 
     fireEvent.click(csvButton);
     expect(mockDownloadResultsAsCsv).toHaveBeenCalledTimes(1);
-    const { results } = queries[0];
+    const results = queries[0].results!;
     expect(mockDownloadResultsAsCsv).toHaveBeenCalledWith(
       results.data,
       results.columns.map((c: { column_name: string }) => c.column_name),
