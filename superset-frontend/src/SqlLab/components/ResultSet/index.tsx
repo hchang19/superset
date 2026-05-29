@@ -330,11 +330,15 @@ const ResultSet = ({
       };
 
       const triggerClientCsvDownload = () => {
-        downloadResultsAsCsv(
-          data,
-          columns.map(c => c.column_name),
-          `${query?.tab || 'results'}.csv`,
-        );
+        try {
+          downloadResultsAsCsv(
+            data,
+            columns.map(c => c.column_name),
+            `${query?.tab || 'results'}.csv`,
+          );
+        } catch (error) {
+          addDangerToast(t('Export failed: %s', String(error)));
+        }
       };
 
       const handleDownloadCsv = (event: React.MouseEvent<HTMLElement>) => {
