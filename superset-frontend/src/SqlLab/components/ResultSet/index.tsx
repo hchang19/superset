@@ -374,9 +374,9 @@ const ResultSet = ({
               tooltip={
                 !canExportData
                   ? t("You don't have permission to export data")
-                  : t('Download CSV')
+                  : t('Download to CSV')
               }
-              aria-label={t('Download CSV')}
+              aria-label={t('Download to CSV')}
               disabled={!canExportData}
               data-test="export-csv-button"
               onClick={e => {
