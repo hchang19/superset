@@ -65,7 +65,10 @@ import { EXPLORE_CHART_DEFAULT, SqlLabRootState } from 'src/SqlLab/types';
 import { mountExploreUrl } from 'src/explore/exploreUtils';
 import { postFormData } from 'src/explore/exploreUtils/formData';
 import { addDangerToast } from 'src/components/MessageToasts/actions';
-import { prepareCopyToClipboardTabularData } from 'src/utils/common';
+import {
+  prepareCopyToClipboardTabularData,
+  downloadResultsAsCsv,
+} from 'src/utils/common';
 import { getItem, LocalStorageKeys } from 'src/utils/localStorageHelpers';
 import {
   addQueryEditor,
@@ -84,10 +87,8 @@ import {
 } from 'src/logger/LogUtils';
 import { Icons } from '@superset-ui/core/components/Icons';
 import { usePermissions } from 'src/hooks/usePermissions';
-import { StreamingExportModal } from 'src/components/StreamingExportModal';
-import { useStreamingExport } from 'src/components/StreamingExportModal/useStreamingExport';
+
 import { useConfirmModal } from 'src/hooks/useConfirmModal';
-import { makeUrl } from 'src/utils/pathUtils';
 import ExploreCtasResultsButton from '../ExploreCtasResultsButton';
 import ExploreResultsButton from '../ExploreResultsButton';
 import HighlightedSql from '../HighlightedSql';
@@ -173,10 +174,6 @@ const ResultSet = ({
   defaultQueryLimit,
   useFixedHeight = false,
 }: ResultSetProps) => {
-  const streamingThreshold = useSelector(
-    (state: SqlLabRootState) =>
-      state.common?.conf?.CSV_STREAMING_ROW_THRESHOLD || 1000,
-  );
   const query = useSelector(
     ({ sqlLab: { queries } }: SqlLabRootState) =>
       pick(queries[queryId], [
@@ -217,7 +214,7 @@ const ResultSet = ({
   const [searchText, setSearchText] = useState('');
   const [cachedData, setCachedData] = useState<Record<string, unknown>[]>([]);
   const [showSaveDatasetModal, setShowSaveDatasetModal] = useState(false);
-  const [showStreamingModal, setShowStreamingModal] = useState(false);
+
   const orderedColumnKeys = useMemo(
     () => query.results?.columns?.map(col => col.column_name) ?? EMPTY,
     [query.results?.columns],
@@ -235,14 +232,6 @@ const ResultSet = ({
   const dispatch = useAppDispatch();
   const logAction = useLogAction({ queryId, sqlEditorId: query.sqlEditorId });
   const { showConfirm, ConfirmModal } = useConfirmModal();
-
-  const { progress, startExport, resetExport, retryExport, cancelExport } =
-    useStreamingExport({
-      onComplete: () => {},
-      onError: error => {
-        addDangerToast(t('Export failed: %s', error));
-      },
-    });
 
   const reRunQueryIfSessionTimeoutErrorOnMount = useCallback(() => {
     if (
@@ -320,31 +309,6 @@ const ResultSet = ({
     }
   };
 
-  const getExportCsvUrl = (clientId: string) =>
-    makeUrl(`/api/v1/sqllab/export/${clientId}/`);
-
-  const handleCloseStreamingModal = () => {
-    cancelExport();
-    setShowStreamingModal(false);
-    resetExport();
-  };
-
-  const shouldUseStreamingExport = () => {
-    const { rows, queryLimit, limitingFactor } = query;
-    const limit = queryLimit || query.results?.query?.limit;
-    const rowsCount = Math.min(rows || 0, query.results?.data?.length || 0);
-
-    let actualRowCount = rowsCount;
-
-    if (limitingFactor === LimitingFactor.NotLimited && rows) {
-      actualRowCount = rows;
-    } else if (limit) {
-      actualRowCount = Math.max(actualRowCount, limit);
-    }
-
-    return actualRowCount >= streamingThreshold;
-  };
-
   const renderControls = () => {
     if (search || visualize || csv) {
       const { limitingFactor, queryLimit, results, rows } = query;
@@ -365,24 +329,31 @@ const ResultSet = ({
         schema: query?.schema,
       };
 
+      const triggerClientCsvDownload = () => {
+        downloadResultsAsCsv(
+          data,
+          columns.map(c => c.column_name),
+          `${query?.tab || 'results'}.csv`,
+        );
+      };
+
       const handleDownloadCsv = (event: React.MouseEvent<HTMLElement>) => {
+        event.preventDefault();
         logAction(LOG_ACTIONS_SQLLAB_DOWNLOAD_CSV, {});
 
         if (limitingFactor === LimitingFactor.Dropdown && limit === rowsCount) {
-          event.preventDefault();
-
           showConfirm({
             title: t('Download is on the way'),
             body: t(
               'Downloading %(rows)s rows based on the LIMIT configuration. If you want the entire result set, you need to adjust the LIMIT.',
               { rows: rowsCount.toLocaleString() },
             ),
-            onConfirm: () => {
-              window.location.href = getExportCsvUrl(query.id);
-            },
+            onConfirm: triggerClientCsvDownload,
             confirmText: t('OK'),
             cancelText: t('Close'),
           });
+        } else {
+          triggerClientCsvDownload();
         }
       };
 
@@ -403,32 +374,14 @@ const ResultSet = ({
               tooltip={
                 !canExportData
                   ? t("You don't have permission to export data")
-                  : t('Download to CSV')
+                  : t('Download CSV')
               }
-              aria-label={t('Download to CSV')}
+              aria-label={t('Download CSV')}
               disabled={!canExportData}
-              {...(canExportData &&
-                !shouldUseStreamingExport() && {
-                  href: getExportCsvUrl(query.id),
-                })}
               data-test="export-csv-button"
               onClick={e => {
                 if (!canExportData) return;
-                const useStreaming = shouldUseStreamingExport();
-
-                if (useStreaming) {
-                  e.preventDefault();
-                  setShowStreamingModal(true);
-
-                  startExport({
-                    url: makeUrl('/api/v1/sqllab/export_streaming/'),
-                    payload: { client_id: query.id },
-                    exportType: 'csv',
-                    expectedRows: rows,
-                  });
-                } else {
-                  handleDownloadCsv(e);
-                }
+                handleDownloadCsv(e);
               }}
             />
           )}
@@ -773,12 +726,6 @@ const ResultSet = ({
               </div>
             )}
           </ResultContainer>
-          <StreamingExportModal
-            visible={showStreamingModal}
-            onCancel={handleCloseStreamingModal}
-            onRetry={retryExport}
-            progress={progress}
-          />
           {ConfirmModal}
         </>
       );
@@ -787,12 +734,6 @@ const ResultSet = ({
       return (
         <>
           <Alert type="warning" message={t('The query returned no data')} />
-          <StreamingExportModal
-            visible={showStreamingModal}
-            onCancel={handleCloseStreamingModal}
-            onRetry={retryExport}
-            progress={progress}
-          />
         </>
       );
     }
@@ -816,12 +757,6 @@ const ResultSet = ({
           >
             {t('Fetch data preview')}
           </Button>
-          <StreamingExportModal
-            visible={showStreamingModal}
-            onCancel={handleCloseStreamingModal}
-            onRetry={retryExport}
-            progress={progress}
-          />
         </>
       );
     }
@@ -835,12 +770,6 @@ const ResultSet = ({
           >
             {t('Refetch results')}
           </Button>
-          <StreamingExportModal
-            visible={showStreamingModal}
-            onCancel={handleCloseStreamingModal}
-            onRetry={retryExport}
-            progress={progress}
-          />
         </>
       );
     }
@@ -854,11 +783,6 @@ const ResultSet = ({
         <Alert type="success" message={progressMsg} closable={false} />
       )}
       {trackingUrl && <div>{trackingUrl}</div>}
-      <StreamingExportModal
-        visible={showStreamingModal}
-        onCancel={handleCloseStreamingModal}
-        progress={progress}
-      />
     </ResultlessStyles>
   );
 };

@@ -59,17 +59,11 @@ jest.mock('src/components/ErrorMessage', () => ({
   ErrorMessageWithStackTrace: () => <div data-test="error-message">Error</div>,
 }));
 
-// Mock useStreamingExport to capture startExport calls
-const mockStartExport = jest.fn();
-const mockResetExport = jest.fn();
-const mockCancelExport = jest.fn();
-jest.mock('src/components/StreamingExportModal/useStreamingExport', () => ({
-  useStreamingExport: () => ({
-    startExport: mockStartExport,
-    resetExport: mockResetExport,
-    cancelExport: mockCancelExport,
-    progress: { status: 'streaming', rowsProcessed: 0 },
-  }),
+const mockDownloadResultsAsCsv = jest.fn();
+jest.mock('src/utils/common', () => ({
+  ...jest.requireActual('src/utils/common'),
+  downloadResultsAsCsv: (...args: unknown[]) =>
+    mockDownloadResultsAsCsv(...args),
 }));
 
 jest.mock(
@@ -159,7 +153,7 @@ describe('ResultSet', () => {
 
   beforeEach(() => {
     applicationRootMock.mockReturnValue('');
-    mockStartExport.mockClear();
+    mockDownloadResultsAsCsv.mockClear();
   });
 
   // Add cleanup after each test
@@ -471,38 +465,38 @@ describe('ResultSet', () => {
     ).not.toBeInTheDocument();
   });
 
-  test.each(['', '/myapp'])(
-    'should allow download as CSV when user has permission to export data with app_root=%s',
-    async app_root => {
-      applicationRootMock.mockReturnValue(app_root);
-      const { queryByTestId } = setup(
-        mockedProps,
-        mockStore({
-          ...initialState,
-          user: {
-            ...user,
-            roles: {
-              sql_lab: [['can_export_csv', 'SQLLab']],
-            },
+  test('should trigger client-side CSV download when user has permission and clicks button', async () => {
+    const { getByTestId } = setup(
+      mockedProps,
+      mockStore({
+        ...initialState,
+        user: {
+          ...user,
+          roles: {
+            sql_lab: [['can_export_csv', 'SQLLab']],
           },
-          sqlLab: {
-            ...initialState.sqlLab,
-            queries: {
-              [queries[0].id]: queries[0],
-            },
+        },
+        sqlLab: {
+          ...initialState.sqlLab,
+          queries: {
+            [queries[0].id]: queries[0],
           },
-        }),
-      );
-      expect(queryByTestId('export-csv-button')).toBeInTheDocument();
-      const export_csv_button = screen.getByTestId('export-csv-button');
-      expect(export_csv_button).toHaveAttribute(
-        'href',
-        expect.stringMatching(
-          new RegExp(`^${app_root}/api/v1/sqllab/export/[a-zA-Z0-9]+/$`),
-        ),
-      );
-    },
-  );
+        },
+      }),
+    );
+    const csvButton = getByTestId('export-csv-button');
+    expect(csvButton).toBeInTheDocument();
+    expect(csvButton).toBeEnabled();
+
+    fireEvent.click(csvButton);
+    expect(mockDownloadResultsAsCsv).toHaveBeenCalledTimes(1);
+    const { results } = queries[0];
+    expect(mockDownloadResultsAsCsv).toHaveBeenCalledWith(
+      results.data,
+      results.columns.map((c: { column_name: string }) => c.column_name),
+      expect.stringContaining('.csv'),
+    );
+  });
 
   test('should display a popup message when the CSV content is limited to the dropdown limit', async () => {
     const queryLimit = 2;
@@ -645,132 +639,26 @@ describe('ResultSet', () => {
     expect(resultsCalls).toHaveLength(1);
   });
 
-  test('should use non-streaming export (href) when rows below threshold', async () => {
-    // This test validates that when rows < CSV_STREAMING_ROW_THRESHOLD,
-    // the component uses the direct download href instead of streaming export.
-    const appRoot = '/superset';
-    applicationRootMock.mockReturnValue(appRoot);
-
-    // Create a query with rows BELOW the threshold
-    const smallQuery = {
-      ...queries[0],
-      rows: 500, // Below the 1000 threshold
-      limitingFactor: 'NOT_LIMITED',
-    };
-
+  test('should not trigger download when user lacks export permission', async () => {
     const { getByTestId } = setup(
       mockedProps,
       mockStore({
         ...initialState,
-        user: {
-          ...user,
-          roles: {
-            sql_lab: [['can_export_csv', 'SQLLab']],
-          },
-        },
+        user,
         sqlLab: {
           ...initialState.sqlLab,
           queries: {
-            [smallQuery.id]: smallQuery,
-          },
-        },
-        common: {
-          conf: {
-            CSV_STREAMING_ROW_THRESHOLD: 1000,
+            [queries[0].id]: queries[0],
           },
         },
       }),
     );
+    const csvButton = getByTestId('export-csv-button');
+    expect(csvButton).toBeDisabled();
 
-    await waitFor(() => {
-      expect(getByTestId('export-csv-button')).toBeInTheDocument();
-    });
-
-    const exportButton = getByTestId('export-csv-button');
-
-    // Non-streaming export should have href attribute with prefixed URL
-    expect(exportButton).toHaveAttribute(
-      'href',
-      expect.stringMatching(new RegExp(`^${appRoot}/api/v1/sqllab/export/`)),
-    );
-
-    // Click should NOT trigger startExport for non-streaming
-    fireEvent.click(exportButton);
-    expect(mockStartExport).not.toHaveBeenCalled();
+    fireEvent.click(csvButton);
+    expect(mockDownloadResultsAsCsv).not.toHaveBeenCalled();
   });
-
-  test.each([
-    {
-      name: 'no prefix (default deployment)',
-      appRoot: '',
-      expectedUrl: '/api/v1/sqllab/export_streaming/',
-    },
-    {
-      name: 'with subdirectory prefix',
-      appRoot: '/superset',
-      expectedUrl: '/superset/api/v1/sqllab/export_streaming/',
-    },
-    {
-      name: 'with nested subdirectory prefix',
-      appRoot: '/my-app/superset',
-      expectedUrl: '/my-app/superset/api/v1/sqllab/export_streaming/',
-    },
-  ])(
-    'streaming export URL respects app root configuration: $name',
-    async ({ appRoot, expectedUrl }) => {
-      // This test validates that streaming export startExport receives the correct URL
-      // based on the applicationRoot configuration.
-      applicationRootMock.mockReturnValue(appRoot);
-
-      // Create a query with enough rows to trigger streaming export (>= threshold)
-      const largeQuery = {
-        ...queries[0],
-        rows: 5000, // Above the default 1000 threshold
-        limitingFactor: 'NOT_LIMITED',
-      };
-
-      const { getByTestId } = setup(
-        mockedProps,
-        mockStore({
-          ...initialState,
-          user: {
-            ...user,
-            roles: {
-              sql_lab: [['can_export_csv', 'SQLLab']],
-            },
-          },
-          sqlLab: {
-            ...initialState.sqlLab,
-            queries: {
-              [largeQuery.id]: largeQuery,
-            },
-          },
-          common: {
-            conf: {
-              CSV_STREAMING_ROW_THRESHOLD: 1000,
-            },
-          },
-        }),
-      );
-
-      await waitFor(() => {
-        expect(getByTestId('export-csv-button')).toBeInTheDocument();
-      });
-
-      const exportButton = getByTestId('export-csv-button');
-      fireEvent.click(exportButton);
-
-      // Verify startExport was called exactly once
-      expect(mockStartExport).toHaveBeenCalledTimes(1);
-
-      // The URL should match the expected prefixed URL
-      expect(mockStartExport).toHaveBeenCalledWith(
-        expect.objectContaining({
-          url: expectedUrl,
-        }),
-      );
-    },
-  );
 
   test('should show CSV button with granular can_export_data permission when flag is ON', async () => {
     mockIsFeatureEnabled.mockImplementation(

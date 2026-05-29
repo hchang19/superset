@@ -20,6 +20,7 @@ import {
   applyFormattingToTabularData,
   optionFromValue,
   prepareCopyToClipboardTabularData,
+  downloadResultsAsCsv,
   NULL_STRING,
   TRUE_STRING,
   FALSE_STRING,
@@ -154,6 +155,69 @@ describe('utils/common', () => {
       expect(
         applyFormattingToTabularData(originalData, timeFormattedColumns),
       ).toEqual(expectedData);
+    });
+  });
+  // eslint-disable-next-line no-restricted-globals -- TODO: Migrate from describe blocks
+  describe('downloadResultsAsCsv', () => {
+    let createObjectURLMock: jest.Mock;
+    let revokeObjectURLMock: jest.Mock;
+    let appendChildSpy: jest.SpyInstance;
+    let removeChildSpy: jest.SpyInstance;
+    let clickSpy: jest.Mock;
+    let setAttributeSpy: jest.Mock;
+
+    beforeEach(() => {
+      createObjectURLMock = jest.fn().mockReturnValue('blob:mock-url');
+      revokeObjectURLMock = jest.fn();
+      global.URL.createObjectURL = createObjectURLMock;
+      global.URL.revokeObjectURL = revokeObjectURLMock;
+      clickSpy = jest.fn();
+      setAttributeSpy = jest.fn();
+      jest.spyOn(document, 'createElement').mockReturnValue({
+        setAttribute: setAttributeSpy,
+        click: clickSpy,
+      } as unknown as HTMLElement);
+      appendChildSpy = jest
+        .spyOn(document.body, 'appendChild')
+        .mockImplementation(node => node);
+      removeChildSpy = jest
+        .spyOn(document.body, 'removeChild')
+        .mockImplementation(node => node);
+    });
+
+    afterEach(() => {
+      jest.restoreAllMocks();
+    });
+
+    test('generates CSV blob and triggers download', () => {
+      const data: TabularDataRow[] = [
+        { name: 'Alice', age: 30 },
+        { name: 'Bob', age: 25 },
+      ];
+      downloadResultsAsCsv(data, ['name', 'age']);
+
+      const blobArg = createObjectURLMock.mock.calls[0][0] as Blob;
+      expect(blobArg).toBeInstanceOf(Blob);
+      expect(blobArg.type).toBe('text/csv;charset=utf-8;');
+      expect(clickSpy).toHaveBeenCalledTimes(1);
+      expect(revokeObjectURLMock).toHaveBeenCalledWith('blob:mock-url');
+    });
+
+    test('sets correct download filename and cleans up DOM', () => {
+      const data: TabularDataRow[] = [{ col: 'val' }];
+      downloadResultsAsCsv(data, ['col'], 'test.csv');
+
+      expect(setAttributeSpy).toHaveBeenCalledWith('download', 'test.csv');
+      expect(appendChildSpy).toHaveBeenCalledTimes(1);
+      expect(removeChildSpy).toHaveBeenCalledTimes(1);
+    });
+
+    test('handles empty data with headers only', () => {
+      downloadResultsAsCsv([], ['col1', 'col2']);
+
+      const blobArg = createObjectURLMock.mock.calls[0][0] as Blob;
+      expect(blobArg).toBeInstanceOf(Blob);
+      expect(clickSpy).toHaveBeenCalledTimes(1);
     });
   });
 });
