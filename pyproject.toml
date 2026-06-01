@@ -64,6 +64,7 @@ dependencies = [
     "holidays>=0.45, <1",
     "humanize",
     "isodate",
+    "jinja2>=3.1.4",
     "jsonpath-ng>=1.6.1, <2",
     "Mako>=1.2.2",
     "markdown>=3.10.2",
