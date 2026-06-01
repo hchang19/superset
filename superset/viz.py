@@ -626,7 +626,10 @@ class BaseViz:  # pylint: disable=too-many-public-methods
 
                 error = dataclasses.asdict(
                     SupersetError(
-                        message=str(ex),
+                        message=_(
+                            "A database error occurred. "
+                            "Please check your query and try again."
+                        ),
                         level=ErrorLevel.ERROR,
                         error_type=SupersetErrorType.VIZ_GET_DF_ERROR,
                     )
@@ -643,6 +646,7 @@ class BaseViz:  # pylint: disable=too-many-public-methods
                     cache_timeout=cache_timeout,
                     datasource_uid=self.datasource.uid,
                 )
+        is_failed = self.status == QueryStatus.FAILED
         return {
             "cache_key": cache_key,
             "cached_dttm": cache_value["dttm"] if cache_value is not None else None,
@@ -651,11 +655,11 @@ class BaseViz:  # pylint: disable=too-many-public-methods
             "errors": self.errors,
             "form_data": self.form_data,
             "is_cached": cache_value is not None,
-            "query": self.query,
+            "query": "" if is_failed else self.query,
             "from_dttm": self.from_dttm,
             "to_dttm": self.to_dttm,
             "status": self.status,
-            "stacktrace": stacktrace,
+            "stacktrace": None if is_failed else stacktrace,
             "rowcount": len(df.index) if df is not None else 0,
             "colnames": list(df.columns) if df is not None else None,
             "coltypes": (

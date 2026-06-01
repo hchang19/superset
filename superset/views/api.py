@@ -29,6 +29,7 @@ from superset.commands.chart.exceptions import (
     TimeRangeAmbiguousError,
     TimeRangeParseFailError,
 )
+from superset.common.db_query_status import QueryStatus
 from superset.legacy import update_time_range
 from superset.models.slice import Slice
 from superset.superset_typing import FlaskResponse
@@ -73,6 +74,10 @@ class Api(BaseSupersetView):
         query_context.raise_for_access()
         result = query_context.get_payload()
         payload_json = result["queries"]
+        for query in payload_json:
+            if query.get("status") == QueryStatus.FAILED:
+                query.pop("query", None)
+                query.pop("stacktrace", None)
         return json.dumps(payload_json, default=json.json_int_dttm_ser, ignore_nan=True)
 
     @event_logger.log_this

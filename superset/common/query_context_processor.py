@@ -110,6 +110,7 @@ class QueryContextProcessor:
         ):
             cache.is_loaded = False
 
+        is_validation_error = False
         if query_obj and cache_key and not cache.is_loaded:
             try:
                 if invalid_columns := [
@@ -142,6 +143,23 @@ class QueryContextProcessor:
             except QueryObjectValidationError as ex:
                 cache.error_message = str(ex)
                 cache.status = QueryStatus.FAILED
+                is_validation_error = True
+
+        # Sanitize error responses to prevent SQL information disclosure.
+        # Database execution errors may contain raw SQL fragments and internal
+        # table/schema names. Validation errors are safe to expose as-is.
+        if (
+            cache.status == QueryStatus.FAILED
+            and cache.error_message
+            and not is_validation_error
+        ):
+            logger.error(
+                "Chart query error (sanitized from response): %s",
+                cache.error_message,
+            )
+            cache.error_message = _(
+                "A database error occurred. Please check your query and try again."
+            )
 
         # the N-dimensional DataFrame has converted into flat DataFrame
         # by `flatten operator`, "comma" in the column is escaped by `escape_separator`
@@ -202,6 +220,7 @@ class QueryContextProcessor:
                 row_count=f"{row_count:,}",
             )
 
+        is_failed = cache.status == QueryStatus.FAILED
         return {
             "cache_key": cache_key,
             "cached_dttm": cache.cache_dttm,
@@ -214,9 +233,9 @@ class QueryContextProcessor:
             "annotation_data": cache.annotation_data,
             "error": cache.error_message,
             "is_cached": cache.is_cached,
-            "query": cache.query,
+            "query": "" if is_failed else cache.query,
             "status": cache.status,
-            "stacktrace": cache.stacktrace,
+            "stacktrace": None if is_failed else cache.stacktrace,
             "rowcount": len(cache.df.index),
             "sql_rowcount": cache.sql_rowcount,
             "from_dttm": query_obj.from_dttm,

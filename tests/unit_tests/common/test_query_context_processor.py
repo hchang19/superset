@@ -1726,3 +1726,137 @@ def test_get_df_payload_no_warning_when_not_memory_limited() -> None:
                     result = processor.get_df_payload(query_obj, force_cached=False)
 
     assert result["warning"] is None
+
+
+def test_get_df_payload_sanitizes_db_error_message() -> None:
+    """
+    Regression test for #59: database execution errors must be sanitized
+    to prevent information disclosure of internal SQL / table / schema names.
+
+    When a query fails at the database layer (not a validation error),
+    the error returned to the client must be a generic message, and
+    the ``query`` and ``stacktrace`` fields must be stripped.
+    """
+    from superset.common.query_object import QueryObject
+
+    mock_datasource = MagicMock()
+    mock_datasource.uid = "ds_1"
+    mock_datasource.cache_timeout = None
+    mock_datasource.changed_on = None
+    mock_datasource.column_names = ["col1"]
+
+    mock_query_context = MagicMock()
+    mock_query_context.force = False
+    mock_query_context.datasource = mock_datasource
+
+    processor = QueryContextProcessor(mock_query_context)
+    processor._qc_datasource = mock_datasource
+
+    query_obj = QueryObject(
+        datasource=mock_datasource,
+        columns=["col1"],
+    )
+
+    raw_sql = "SELECT col1 FROM secret_schema.internal_table WHERE id = 1"
+    raw_db_error = (
+        '(psycopg2.errors.UndefinedColumn) column "nonexistent" '
+        "does not exist\n"
+        "LINE 1: ...FROM secret_schema.internal_table WHERE nonexistent = 1\n"
+    )
+
+    with patch(
+        "superset.common.query_context_processor.QueryCacheManager"
+    ) as mock_cache_manager:
+        mock_cache = MagicMock()
+        mock_cache.is_loaded = False
+        mock_cache.df = pd.DataFrame()
+        mock_cache.query = raw_sql
+        mock_cache.error_message = raw_db_error
+        mock_cache.status = QueryStatus.FAILED
+        mock_cache.stacktrace = "Traceback (most recent call last):\n  ..."
+        mock_cache.applied_filter_columns = []
+        mock_cache.applied_template_filters = []
+        mock_cache.rejected_filter_columns = []
+        mock_cache.annotation_data = {}
+        mock_cache.is_cached = False
+        mock_cache.sql_rowcount = 0
+        mock_cache.cache_dttm = None
+        mock_cache.queried_dttm = None
+        mock_cache.bq_memory_limited = False
+        mock_cache_manager.get.return_value = mock_cache
+
+        with patch.object(query_obj, "validate", return_value=None):
+            with patch.object(processor, "query_cache_key", return_value="key"):
+                with patch.object(processor, "get_cache_timeout", return_value=3600):
+                    result = processor.get_df_payload(query_obj, force_cached=False)
+
+    assert "secret_schema" not in str(result.get("error", ""))
+    assert "internal_table" not in str(result.get("error", ""))
+    assert "psycopg2" not in str(result.get("error", ""))
+    assert "A database error occurred" in str(result.get("error", ""))
+    assert result["query"] == ""
+    assert result["stacktrace"] is None
+
+
+def test_get_df_payload_preserves_validation_error_message() -> None:
+    """
+    Regression test for #59: validation errors raised by Superset itself
+    (e.g. missing columns) should still be returned verbatim — only
+    database-engine errors are sanitized.
+    """
+    from superset.common.query_object import QueryObject
+    from superset.exceptions import QueryObjectValidationError
+
+    mock_datasource = MagicMock()
+    mock_datasource.uid = "ds_1"
+    mock_datasource.cache_timeout = None
+    mock_datasource.changed_on = None
+    mock_datasource.column_names = ["col1"]
+
+    mock_query_context = MagicMock()
+    mock_query_context.force = True
+    mock_query_context.datasource = mock_datasource
+
+    processor = QueryContextProcessor(mock_query_context)
+    processor._qc_datasource = mock_datasource
+
+    query_obj = QueryObject(
+        datasource=mock_datasource,
+        columns=["col1", "nonexistent_col"],
+    )
+
+    validation_msg = "Columns missing in dataset: ['nonexistent_col']"
+
+    with patch(
+        "superset.common.query_context_processor.QueryCacheManager"
+    ) as mock_cache_manager:
+        mock_cache = MagicMock()
+        mock_cache.is_loaded = False
+        mock_cache.df = pd.DataFrame()
+        mock_cache.query = ""
+        mock_cache.error_message = None
+        mock_cache.status = None
+        mock_cache.stacktrace = None
+        mock_cache.applied_filter_columns = []
+        mock_cache.applied_template_filters = []
+        mock_cache.rejected_filter_columns = []
+        mock_cache.annotation_data = {}
+        mock_cache.is_cached = False
+        mock_cache.sql_rowcount = 0
+        mock_cache.cache_dttm = None
+        mock_cache.queried_dttm = None
+        mock_cache.bq_memory_limited = False
+        mock_cache_manager.get.return_value = mock_cache
+
+        with patch.object(query_obj, "validate", return_value=None):
+            with patch.object(processor, "query_cache_key", return_value="key"):
+                with patch.object(processor, "get_cache_timeout", return_value=3600):
+                    with patch.object(
+                        processor,
+                        "get_query_result",
+                        side_effect=QueryObjectValidationError(validation_msg),
+                    ):
+                        result = processor.get_df_payload(query_obj, force_cached=False)
+
+    assert result["error"] == validation_msg
+    assert result["status"] == QueryStatus.FAILED
