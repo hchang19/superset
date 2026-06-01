@@ -509,7 +509,10 @@ class TestCore(SupersetTestCase):
 
         assert "errors" in data, data
         assert data["errors"][0]["error_type"] == "VIZ_GET_DF_ERROR"
-        assert data["errors"][0]["message"] == "boom"
+        assert (
+            data["errors"][0]["message"]
+            == "A database error occurred. Please check your query and try again."
+        )
 
     def test_results_default_deserialization(self):
         use_new_deserialization = False
