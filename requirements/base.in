@@ -35,6 +35,8 @@ pyarrow>=20.0.0,<21.0.0
 pyopenssl>=26.0.0,<27.0.0
 # Security: CVE-2026-25645 (MEDIUM) - Insecure Temporary File
 requests>=2.33.0,<3.0.0
+# Security: CVE-2023-44271 (MEDIUM) - Uncontrolled resource consumption in ImageFont
+Pillow>=10.0.1,<13
 
 # 5.0.0 has a sensitive deprecation used in other libs
 # -> https://github.com/aio-libs/async-timeout/blob/master/CHANGES.rst#500-2024-10-31
