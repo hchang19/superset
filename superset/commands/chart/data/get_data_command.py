@@ -30,6 +30,11 @@ from superset.exceptions import CacheLoadError
 
 logger = logging.getLogger(__name__)
 
+GENERIC_CHART_QUERY_ERROR = _(
+    "An error occurred while executing the chart query. "
+    "Please verify your chart configuration and try again."
+)
+
 
 class ChartDataCommand(BaseCommand):
     _query_context: QueryContext
@@ -56,9 +61,8 @@ class ChartDataCommand(BaseCommand):
                 query.get("error")
                 and self._query_context.result_type != ChartDataResultType.QUERY
             ):
-                raise ChartDataQueryFailedError(
-                    _("Error: %(error)s", error=query["error"])
-                )
+                logger.error("Chart query failed: %s", query["error"], exc_info=False)
+                raise ChartDataQueryFailedError(GENERIC_CHART_QUERY_ERROR)
 
         return_value = {
             "query_context": self._query_context,

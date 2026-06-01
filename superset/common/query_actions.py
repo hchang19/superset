@@ -199,6 +199,13 @@ def _get_full(
             "sql_rowcount": payload.get("sql_rowcount"),
             "detected_currency": payload.get("detected_currency"),
         }
+
+    if status == QueryStatus.FAILED:
+        logger.error("Chart query failed: %s", payload.get("error"))
+        payload.pop("query", None)
+        payload.pop("stacktrace", None)
+        payload["error"] = str(_("An error occurred while running the query."))
+
     return payload
 
 

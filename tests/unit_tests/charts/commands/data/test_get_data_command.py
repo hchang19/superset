@@ -59,10 +59,8 @@ def test_query_result_type_allows_validation_error_payload() -> None:
 
 def test_full_result_type_raises_on_error() -> None:
     """
-    Test that result_type='full' with error raises ChartDataQueryFailedError.
-
-    This ensures data requests continue to fail fast when errors occur,
-    maintaining existing behavior for non-query requests.
+    Test that result_type='full' with error raises ChartDataQueryFailedError
+    with a generic message that does not expose internal details.
     """
     # Mock QueryContext with result_type=FULL
     mock_query_context = Mock(spec=QueryContext)
@@ -77,14 +75,15 @@ def test_full_result_type_raises_on_error() -> None:
     with pytest.raises(ChartDataQueryFailedError) as exc_info:
         command.run()
 
-    assert "Invalid column name" in str(exc_info.value)
+    # Error should be generic, NOT exposing the raw DB error
+    assert "Invalid column name" not in str(exc_info.value)
+    assert "chart query" in str(exc_info.value).lower()
 
 
 def test_results_result_type_raises_on_error() -> None:
     """
-    Test that result_type='results' with error raises ChartDataQueryFailedError.
-
-    Ensures fail-fast behavior is preserved for results-only requests.
+    Test that result_type='results' with error raises ChartDataQueryFailedError
+    with a generic message that does not expose internal details.
     """
     # Mock QueryContext with result_type=RESULTS
     mock_query_context = Mock(spec=QueryContext)
@@ -99,7 +98,9 @@ def test_results_result_type_raises_on_error() -> None:
     with pytest.raises(ChartDataQueryFailedError) as exc_info:
         command.run()
 
-    assert "Database connection failed" in str(exc_info.value)
+    # Error should be generic, NOT exposing the raw DB error
+    assert "Database connection failed" not in str(exc_info.value)
+    assert "chart query" in str(exc_info.value).lower()
 
 
 def test_query_result_type_returns_successful_query() -> None:
@@ -206,7 +207,9 @@ def test_full_result_type_fails_fast_on_first_error_in_multiple_queries() -> Non
     with pytest.raises(ChartDataQueryFailedError) as exc_info:
         command.run()
 
-    assert "First query failed" in str(exc_info.value)
+    # Error should be generic, NOT exposing the raw DB error
+    assert "First query failed" not in str(exc_info.value)
+    assert "chart query" in str(exc_info.value).lower()
 
 
 def test_get_query_catches_parsing_error() -> None:
