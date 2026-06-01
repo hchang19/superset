@@ -531,6 +531,18 @@ class BaseViz:  # pylint: disable=too-many-public-methods
         if df is not None:
             payload["colnames"] = list(df.columns)
 
+        if self.status == QueryStatus.FAILED:
+            raw_errors = payload.get("errors")
+            if raw_errors:
+                logger.error(
+                    "Viz query errors (sanitized from response): %s",
+                    raw_errors,
+                )
+            payload["errors"] = []
+            payload["error"] = str(_("An error occurred while running the query."))
+            payload["query"] = None
+            payload["stacktrace"] = None
+
         return payload
 
     @deprecated(deprecated_in="3.0")
