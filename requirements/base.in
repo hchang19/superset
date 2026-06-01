@@ -25,6 +25,7 @@ filelock>=3.20.3,<4.0.0
 # Security: decompression bomb fix (required by aiohttp 3.13.3)
 brotli>=1.2.0,<2.0.0
 numexpr>=2.9.0
+# Security: CVE-2023-49083 (MEDIUM) - NULL-dereference parsing PKCS12 (fixed >=41.0.6)
 # Security: CVE-2026-34073 (MEDIUM) - Improper Certificate Validation
 cryptography>=46.0.7,<47.0.0
 # Security: Snyk - XSS vulnerability in Mako templates
