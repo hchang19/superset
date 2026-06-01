@@ -150,6 +150,22 @@ def _detect_currency(
     )
 
 
+def _sanitize_failed_payload(payload: dict[str, Any]) -> None:
+    """
+    Strip internal details from failed query payloads to prevent
+    information disclosure (raw SQL, table/schema names, stacktraces).
+    The raw error is logged server-side before being replaced.
+    """
+    if raw_error := payload.get("error"):
+        logger.error(
+            "Chart query error (sanitized from response): %s",
+            raw_error,
+        )
+    payload["error"] = _("An error occurred while running the query.")
+    payload["query"] = None
+    payload["stacktrace"] = None
+
+
 def _get_full(
     query_context: QueryContext,
     query_obj: QueryObject,
@@ -199,6 +215,10 @@ def _get_full(
             "sql_rowcount": payload.get("sql_rowcount"),
             "detected_currency": payload.get("detected_currency"),
         }
+
+    if status == QueryStatus.FAILED:
+        _sanitize_failed_payload(payload)
+
     return payload
 
 
