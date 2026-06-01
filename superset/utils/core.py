@@ -536,6 +536,16 @@ def markdown(raw: str, markup_wrap: bool | None = False) -> str:
     return safe
 
 
+def strip_html_tags(value: str) -> str:
+    """Strip HTML tags from a string, preserving text content.
+
+    Used to sanitize user-controlled titles (chart names, dashboard titles)
+    before they are embedded in HTML contexts such as ``<title>`` or
+    ``document.title``.
+    """
+    return re.sub(r"<[^>]*>", "", value)
+
+
 def sanitize_svg_content(svg_content: str) -> str:
     """Basic SVG protection - remove obvious XSS vectors, trust admin input otherwise.
 

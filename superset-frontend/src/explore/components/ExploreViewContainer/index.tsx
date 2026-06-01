@@ -48,6 +48,7 @@ import { logging } from '@apache-superset/core/utils';
 import { debounce, isEqual, isObjectLike, omit, pick } from 'lodash';
 import { Resizable } from 're-resizable';
 import { useHistory } from 'react-router-dom';
+import { sanitizeTitle } from 'src/utils/sanitizeTitle';
 import { Tooltip } from '@superset-ui/core/components';
 import { usePluginContext } from 'src/components';
 import { Global } from '@emotion/react';
@@ -397,7 +398,7 @@ function ExploreViewContainer(props: ExploreViewContainerProps) {
   // Update document title when slice name changes
   useEffect(() => {
     if (props.sliceName) {
-      document.title = props.sliceName;
+      document.title = sanitizeTitle(props.sliceName);
     }
   }, [props.sliceName]);
 

@@ -51,6 +51,7 @@ from superset.utils.core import (
     remove_extra_adhoc_filters,
     sanitize_svg_content,
     sanitize_url,
+    strip_html_tags,
 )
 from tests.conftest import with_config
 
@@ -647,8 +648,9 @@ def test_get_user_agent(mocker: MockerFixture, app_context: None) -> None:
 
 @with_config(
     {
-        "USER_AGENT_FUNC": lambda database,
-        source: f"{database.database_name} {source.name}"
+        "USER_AGENT_FUNC": lambda database, source: (
+            f"{database.database_name} {source.name}"
+        )
     }
 )
 def test_get_user_agent_custom(mocker: MockerFixture, app_context: None) -> None:
@@ -1730,3 +1732,29 @@ def test_markdown_with_markup_wrap() -> None:
 
     assert isinstance(result, Markup)
     assert "<strong>bold</strong>" in str(result)
+
+
+def test_strip_html_tags_removes_script_tags() -> None:
+    assert strip_html_tags("<script>alert(1)</script>") == "alert(1)"
+
+
+def test_strip_html_tags_removes_img_onerror() -> None:
+    assert strip_html_tags("<img src=x onerror=alert(document.cookie)>") == ""
+
+
+def test_strip_html_tags_preserves_special_characters() -> None:
+    assert strip_html_tags("Revenue & Profit") == "Revenue & Profit"
+    assert strip_html_tags('Q1 "Results"') == 'Q1 "Results"'
+    assert strip_html_tags("Year's Summary") == "Year's Summary"
+
+
+def test_strip_html_tags_strips_complex_html() -> None:
+    assert (
+        strip_html_tags('My <b>Bold</b> <script>alert("xss")</script> Title')
+        == 'My Bold alert("xss") Title'
+    )
+
+
+def test_strip_html_tags_returns_plain_text_unchanged() -> None:
+    assert strip_html_tags("My Dashboard") == "My Dashboard"
+    assert strip_html_tags("") == ""

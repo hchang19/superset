@@ -36,6 +36,7 @@ from superset.utils.core import (
     FilterOperator,
     PostProcessingBoxplotWhiskerType,
     PostProcessingContributionOrientation,
+    strip_html_tags,
 )
 
 if TYPE_CHECKING:
@@ -245,6 +246,12 @@ class ChartPostSchema(Schema):
     external_url = fields.String(allow_none=True)
     uuid = fields.UUID(allow_none=True)
 
+    @post_load
+    def sanitize_title(self, data: dict[str, Any], **kwargs: Any) -> dict[str, Any]:
+        if "slice_name" in data and data["slice_name"]:
+            data["slice_name"] = strip_html_tags(data["slice_name"])
+        return data
+
 
 class ChartPutSchema(Schema):
     """
@@ -303,6 +310,12 @@ class ChartPutSchema(Schema):
     external_url = fields.String(allow_none=True)
     tags = fields.List(fields.Integer(metadata={"description": tags_description}))
     uuid = fields.UUID(allow_none=True)
+
+    @post_load
+    def sanitize_title(self, data: dict[str, Any], **kwargs: Any) -> dict[str, Any]:
+        if "slice_name" in data and data["slice_name"]:
+            data["slice_name"] = strip_html_tags(data["slice_name"])
+        return data
 
 
 class ChartGetDatasourceObjectDataResponseSchema(Schema):

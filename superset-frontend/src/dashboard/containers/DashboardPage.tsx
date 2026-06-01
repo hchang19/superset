@@ -51,6 +51,7 @@ import CrudThemeProvider from 'src/components/CrudThemeProvider';
 import type { DashboardChartStates } from 'src/dashboard/types/chartState';
 
 import { nanoid } from 'nanoid';
+import { sanitizeTitle } from 'src/utils/sanitizeTitle';
 import type { ActiveFilters } from '../types';
 import { RootState } from '../types';
 import {
@@ -233,7 +234,7 @@ export const DashboardPage: FC<PageProps> = ({ idOrSlug }: PageProps) => {
   // Update document title when dashboard title changes
   useEffect(() => {
     if (dashboard_title) {
-      document.title = dashboard_title;
+      document.title = sanitizeTitle(dashboard_title);
     }
   }, [dashboard_title]);
 

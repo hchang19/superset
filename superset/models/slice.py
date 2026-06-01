@@ -47,6 +47,7 @@ from superset.tasks.thumbnails import cache_chart_thumbnail
 from superset.tasks.utils import get_current_user
 from superset.thumbnails.digest import get_chart_digest
 from superset.utils import core as utils, json
+from superset.utils.core import strip_html_tags
 from superset.viz import BaseViz, viz_types
 
 if TYPE_CHECKING:
@@ -226,7 +227,7 @@ class Slice(  # pylint: disable=too-many-public-methods
             "modified": self.modified(),
             "owners": [owner.id for owner in self.owners],
             "slice_id": self.id,
-            "slice_name": self.slice_name,
+            "slice_name": strip_html_tags(self.slice_name or ""),
             "slice_url": self.slice_url,
             "certified_by": self.certified_by,
             "certification_details": self.certification_details,
@@ -330,7 +331,7 @@ class Slice(  # pylint: disable=too-many-public-methods
         <a
                 href="{self.datasource_edit_url}"
                 data-toggle="tooltip"
-                title="{self.datasource}">
+                title="{escape(str(self.datasource))}">
             <i class="fa fa-database"></i>
         </a>
         """
