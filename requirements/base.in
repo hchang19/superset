@@ -26,6 +26,7 @@ filelock>=3.20.3,<4.0.0
 brotli>=1.2.0,<2.0.0
 numexpr>=2.9.0
 # Security: CVE-2026-34073 (MEDIUM) - Improper Certificate Validation
+# Security: CVE-2023-49083 (MEDIUM) - NULL-dereference parsing PKCS12 (fixed >=41.0.6)
 cryptography>=46.0.7,<47.0.0
 # Security: CVE-2024-22195 - xmlattr filter allows injection of arbitrary HTML attributes
 jinja2>=3.1.4,<4.0.0
