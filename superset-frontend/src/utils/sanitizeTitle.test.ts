@@ -53,9 +53,7 @@ describe('sanitizeTitle', () => {
   });
 
   test('handles recursive tag injection payloads', () => {
-    const result = sanitizeTitle(
-      '<<script>script>alert(1)</<script>script>',
-    );
+    const result = sanitizeTitle('<<script>script>alert(1)</<script>script>');
     expect(result).not.toContain('<script>');
     expect(result).not.toMatch(/<[^>]*>/g);
   });
