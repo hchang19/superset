@@ -15,6 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 import os
+import re
 from dataclasses import dataclass
 from typing import Any, Optional
 from unittest.mock import MagicMock, patch
@@ -1758,3 +1759,9 @@ def test_strip_html_tags_strips_complex_html() -> None:
 def test_strip_html_tags_returns_plain_text_unchanged() -> None:
     assert strip_html_tags("My Dashboard") == "My Dashboard"
     assert strip_html_tags("") == ""
+
+
+def test_strip_html_tags_handles_recursive_injection() -> None:
+    result = strip_html_tags("<<script>script>alert(1)</<script>script>")
+    assert "<script>" not in result
+    assert not re.search(r"<[^>]*>", result)

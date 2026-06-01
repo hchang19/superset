@@ -26,6 +26,11 @@
  * of an HTML tag are preserved as plain text.
  */
 export function sanitizeTitle(value: string): string {
-  // Remove HTML tags while preserving text content
-  return value.replace(/<[^>]*>/g, '');
+  let result = value;
+  let previous: string;
+  do {
+    previous = result;
+    result = result.replace(/<[^>]*>/g, '');
+  } while (result !== previous);
+  return result;
 }

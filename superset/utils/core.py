@@ -542,8 +542,16 @@ def strip_html_tags(value: str) -> str:
     Used to sanitize user-controlled titles (chart names, dashboard titles)
     before they are embedded in HTML contexts such as ``<title>`` or
     ``document.title``.
+
+    Loops until stable to handle payloads where tag removal reveals a new
+    tag, e.g. ``<<script>script>`` → ``<script>``.
     """
-    return re.sub(r"<[^>]*>", "", value)
+    result = value
+    while True:
+        cleaned = re.sub(r"<[^>]*>", "", result)
+        if cleaned == result:
+            return cleaned
+        result = cleaned
 
 
 def sanitize_svg_content(svg_content: str) -> str:
