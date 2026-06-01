@@ -471,6 +471,7 @@ websocket-client==1.8.0
 werkzeug==3.1.6
     # via
     #   -r requirements/base.in
+    #   apache-superset (pyproject.toml)
     #   flask
     #   flask-appbuilder
     #   flask-cors

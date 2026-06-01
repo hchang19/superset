@@ -107,6 +107,7 @@ dependencies = [
     "typing-extensions>=4, <5",
     "waitress; sys_platform == 'win32'",
     "watchdog>=6.0.0",
+    "werkzeug>=3.0.3",  # CVE-2024-34069 - debugger RCE
     "wtforms>=2.3.3, <4",
     "wtforms-json",
     "xlsxwriter>=3.0.7, <3.3",
