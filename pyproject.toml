@@ -48,6 +48,8 @@ dependencies = [
     "cryptography>=42.0.4, <47.0.0",
     "deprecation>=2.1.0, <2.2.0",
     "flask>=2.2.5, <4.0.0",
+    # Security: CVE-2024-22195 - xmlattr filter allows injection of arbitrary HTML attributes
+    "jinja2>=3.1.4",
     "flask-appbuilder>=5.2.1, <6.0.0",
     "flask-caching>=2.1.0, <3",
     "flask-compress>=1.13, <2.0",
