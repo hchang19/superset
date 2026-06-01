@@ -49,6 +49,7 @@ from superset.commands.chart.exceptions import (
     ChartDataQueryFailedError,
 )
 from superset.common.chart_data import ChartDataResultFormat, ChartDataResultType
+from superset.common.db_query_status import QueryStatus
 from superset.connectors.sqla.models import BaseDatasource
 from superset.constants import (
     CACHE_DISABLED_TIMEOUT,
@@ -540,6 +541,15 @@ class ChartDataRestApi(ChartRestApi):
 
         if result_format == ChartDataResultFormat.JSON:
             queries = result["queries"]
+            for query in queries:
+                query.pop("stacktrace", None)
+                if query.get("status") == QueryStatus.FAILED:
+                    query.pop("query", None)
+                    if query.get("error"):
+                        query["error"] = _(
+                            "An error occurred while processing the query."
+                        )
+
             if security_manager.is_guest_user():
                 for query in queries:
                     query.pop("query", None)
@@ -597,7 +607,10 @@ class ChartDataRestApi(ChartRestApi):
         except ChartDataCacheLoadError as exc:
             return self.response_422(message=exc.message)
         except ChartDataQueryFailedError as exc:
-            return self.response_400(message=exc.message)
+            logger.warning("Chart data query failed: %s", exc.message)
+            return self.response_400(
+                message=_("An error occurred while processing the query.")
+            )
 
             # Log is_cached if extra payload callback is provided
         if add_extra_log_payload and result and "queries" in result:
