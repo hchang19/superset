@@ -51,6 +51,7 @@ from superset.utils.core import (
     remove_extra_adhoc_filters,
     sanitize_svg_content,
     sanitize_url,
+    strip_tags,
 )
 from tests.conftest import with_config
 
@@ -647,8 +648,9 @@ def test_get_user_agent(mocker: MockerFixture, app_context: None) -> None:
 
 @with_config(
     {
-        "USER_AGENT_FUNC": lambda database,
-        source: f"{database.database_name} {source.name}"
+        "USER_AGENT_FUNC": lambda database, source: (
+            f"{database.database_name} {source.name}"
+        )
     }
 )
 def test_get_user_agent_custom(mocker: MockerFixture, app_context: None) -> None:
@@ -1730,3 +1732,27 @@ def test_markdown_with_markup_wrap() -> None:
 
     assert isinstance(result, Markup)
     assert "<strong>bold</strong>" in str(result)
+
+
+def test_strip_tags_removes_script() -> None:
+    assert strip_tags("<script>alert(1)</script>") == ""
+
+
+def test_strip_tags_removes_img_onerror() -> None:
+    assert strip_tags("<img src=x onerror=alert(document.cookie)>") == ""
+
+
+def test_strip_tags_preserves_plain_text() -> None:
+    assert strip_tags("Revenue by Region") == "Revenue by Region"
+
+
+def test_strip_tags_preserves_ampersand() -> None:
+    assert strip_tags("Tom & Jerry") == "Tom & Jerry"
+
+
+def test_strip_tags_preserves_quotes() -> None:
+    assert strip_tags('Chart "Alpha"') == 'Chart "Alpha"'
+
+
+def test_strip_tags_mixed_content() -> None:
+    assert strip_tags("My Chart<script>alert('xss')</script>") == "My Chart"

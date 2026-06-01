@@ -23,6 +23,7 @@ from marshmallow.validate import Length, ValidationError
 from superset import security_manager
 from superset.tags.models import TagType
 from superset.utils import json
+from superset.utils.core import strip_tags
 
 get_delete_ids_schema = {"type": "array", "items": {"type": "integer"}}
 get_export_ids_schema = {"type": "array", "items": {"type": "integer"}}
@@ -341,6 +342,8 @@ class BaseDashboardSchema(Schema):
             data["slug"] = data["slug"].strip()
             data["slug"] = data["slug"].replace(" ", "-")
             data["slug"] = re.sub(r"[^\w\-]+", "", data["slug"])
+        if data.get("dashboard_title"):
+            data["dashboard_title"] = strip_tags(data["dashboard_title"])
         return data
 
 
@@ -386,6 +389,15 @@ class DashboardCopySchema(Schema):
         allow_none=True,
         validate=Length(0, 500),
     )
+
+    @post_load
+    def strip_html_from_title(
+        self, data: dict[str, Any], **kwargs: Any
+    ) -> dict[str, Any]:
+        if data.get("dashboard_title"):
+            data["dashboard_title"] = strip_tags(data["dashboard_title"])
+        return data
+
     css = fields.String(metadata={"description": css_description})
     json_metadata = fields.String(
         metadata={"description": json_metadata_description},

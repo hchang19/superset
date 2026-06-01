@@ -36,6 +36,7 @@ from superset.utils.core import (
     FilterOperator,
     PostProcessingBoxplotWhiskerType,
     PostProcessingContributionOrientation,
+    strip_tags,
 )
 
 if TYPE_CHECKING:
@@ -194,6 +195,15 @@ class ChartPostSchema(Schema):
         required=True,
         validate=Length(1, 250),
     )
+
+    @post_load
+    def strip_html_from_names(
+        self, data: dict[str, Any], **kwargs: Any
+    ) -> dict[str, Any]:
+        if "slice_name" in data and data["slice_name"]:
+            data["slice_name"] = strip_tags(data["slice_name"])
+        return data
+
     description = fields.String(
         metadata={"description": description_description}, allow_none=True
     )
@@ -256,6 +266,15 @@ class ChartPutSchema(Schema):
         allow_none=True,
         validate=Length(0, 250),
     )
+
+    @post_load
+    def strip_html_from_names(
+        self, data: dict[str, Any], **kwargs: Any
+    ) -> dict[str, Any]:
+        if "slice_name" in data and data["slice_name"]:
+            data["slice_name"] = strip_tags(data["slice_name"])
+        return data
+
     description = fields.String(
         metadata={"description": description_description}, allow_none=True
     )

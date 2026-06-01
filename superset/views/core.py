@@ -90,6 +90,7 @@ from superset.utils.core import (
     GenericDataType,
     get_user_id,
     ReservedUrlParameters,
+    strip_tags,
 )
 from superset.views.base import (
     api,
@@ -601,7 +602,7 @@ class Superset(BaseSupersetView):
             "common": common_bootstrap_payload(),
         }
         if slc:
-            title = slc.slice_name
+            title = strip_tags(slc.slice_name)
         elif datasource:
             table_name = (
                 datasource.table_name
@@ -841,7 +842,7 @@ class Superset(BaseSupersetView):
         }
         return self.render_app_template(
             extra_bootstrap_data=bootstrap_payload,
-            title=dashboard.dashboard_title,  # dashboard title is always visible
+            title=strip_tags(dashboard.dashboard_title),
             standalone_mode=ReservedUrlParameters.is_standalone_mode(),
         )
 

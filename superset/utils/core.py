@@ -487,6 +487,21 @@ def error_msg_from_exception(ex: Exception) -> str:
     return str(msg) or str(ex)
 
 
+def strip_tags(text: str) -> str:
+    """Strip all HTML tags from *text*, preserving plain-text content.
+
+    Uses ``nh3`` to remove every HTML element (no tags allowed), then
+    ``html.unescape`` to decode any HTML entities that ``nh3`` may have
+    introduced (e.g. ``&lt;`` back to ``<``).  The result is a safe
+    plain-text string suitable for ``<title>`` elements, ``document.title``
+    assignments, and any other context where raw markup must not appear.
+    """
+    import html as html_mod
+
+    cleaned = nh3.clean(text, tags=set(), attributes={})
+    return html_mod.unescape(cleaned)
+
+
 def markdown(raw: str, markup_wrap: bool | None = False) -> str:
     """Render Markdown to sanitized HTML."""
     safe_markdown_tags = {
